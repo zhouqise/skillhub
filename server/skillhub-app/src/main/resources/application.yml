@@ -332,6 +332,8 @@ management:
       timeout: ${SKILLHUB_OTLP_TIMEOUT:5s}
       compression: ${SKILLHUB_OTLP_COMPRESSION:gzip}
   health:
+    ldap:
+      enabled: ${SKILLHUB_AUTH_LDAP_ENABLED:false}
     mail:
       enabled: ${MANAGEMENT_HEALTH_MAIL_ENABLED:false}
   endpoints:
