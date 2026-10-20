@@ -1,5 +1,5 @@
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowRight, Eye, EyeOff, LockKeyhole, UserRound } from 'lucide-react'
 import { getSessionBootstrapRuntimeConfig } from '@/api/client'
@@ -23,8 +23,11 @@ export function LoginPage() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const search = useSearch({ from: '/login' })
-  const loginMutation = usePasswordLogin()
   const bootstrapConfig = getSessionBootstrapRuntimeConfig()
+  const submitting = useRef(false)
+  const [passwordProvider, setPasswordProvider] = useState('local')
+  const [inFlightProvider, setInFlightProvider] = useState<string | null>(null)
+  const [credentialProvider, setCredentialProvider] = useState('local')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -35,7 +38,39 @@ export function LoginPage() {
   const { data: authMethods, isLoading: authMethodsLoading } = useAuthMethods(returnTo)
   const { data: localCapabilities, isError: localCapabilitiesError } = useLocalAuthCapabilities()
   const passwordEnabled = localCapabilities?.passwordLoginEnabled === true
-  const effectiveLoginMode = passwordEnabled ? loginMode : 'organization'
+  const passwordMethods = [
+    ...(passwordEnabled ? [{ provider: 'local', label: t('login.localLogin') }] : []),
+    ...(authMethods ?? []).filter((method) => method.methodType === 'DIRECT_PASSWORD' && method.provider && method.provider !== 'local')
+      .map((method) => ({ provider: method.provider!, label: method.provider === 'ldap' ? t('login.ldapLogin') : method.displayName })),
+  ]
+  const availableProvider = passwordMethods.some((method) => method.provider === passwordProvider)
+    ? passwordProvider : passwordMethods[0]?.provider ?? 'local'
+  const selectedProvider = inFlightProvider ?? availableProvider
+  const currentPassword = credentialProvider === selectedProvider ? password : ''
+  const hasPasswordMethod = passwordMethods.length > 0
+  const isLocalLogin = selectedProvider === 'local'
+  const loginMutation = usePasswordLogin(isLocalLogin ? 'local' : { provider: selectedProvider })
+  const effectiveLoginMode = hasPasswordMethod ? loginMode : 'organization'
+  const resetLoginMutation = loginMutation.reset
+
+  // Method discovery and capability refresh can change the effective provider without a click.
+  // Keep credentials bound to their source even before this cleanup effect has run.
+  useEffect(() => {
+    setPassword('')
+    setCredentialProvider(selectedProvider)
+    setShowPassword(false)
+    setFieldErrors({})
+    resetLoginMutation()
+  }, [selectedProvider, resetLoginMutation])
+
+  function switchPasswordProvider(provider: string) {
+    if (submitting.current || loginMutation.isPending) return
+    setPasswordProvider(provider)
+    setPassword('')
+    setShowPassword(false)
+    setFieldErrors({})
+    loginMutation.reset()
+  }
   const disabledMessage = search.reason === 'accountDisabled' ? t('apiError.auth.accountDisabled') : null
   const bootstrapMethod = authMethods?.find((method) => method.methodType === 'SESSION_BOOTSTRAP')
   const hasOrganizationMethod = bootstrapConfig.enabled
@@ -43,13 +78,14 @@ export function LoginPage() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (submitting.current || loginMutation.isPending || !hasPasswordMethod) return
     const trimmedUsername = username.trim()
     const nextFieldErrors: { username?: string, password?: string } = {}
 
     if (!trimmedUsername) {
       nextFieldErrors.username = t('login.usernameRequired')
     }
-    if (!password) {
+    if (!currentPassword) {
       nextFieldErrors.password = t('login.passwordRequired')
     }
     if (nextFieldErrors.username || nextFieldErrors.password) {
@@ -58,11 +94,16 @@ export function LoginPage() {
     }
 
     setFieldErrors({})
+    submitting.current = true
+    setInFlightProvider(selectedProvider)
     try {
-      await loginMutation.mutateAsync({ username: trimmedUsername, password })
+      await loginMutation.mutateAsync({ username: trimmedUsername, password: currentPassword })
       await navigate({ to: returnTo })
     } catch {
       // mutation state drives the error UI
+    } finally {
+      submitting.current = false
+      setInFlightProvider(null)
     }
   }
 
@@ -83,19 +124,31 @@ export function LoginPage() {
           </div>
         ) : null}
 
-        {hasOrganizationMethod && passwordEnabled ? (
+        {hasOrganizationMethod && hasPasswordMethod ? (
           <div role="group" aria-label={t('login.loginMode')} className="grid grid-cols-2 rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-900">
-            <button type="button" aria-pressed={loginMode === 'personal'} onClick={() => setLoginMode('personal')} className={`h-11 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 xl:h-10 ${loginMode === 'personal' ? 'bg-sky-100 text-sky-900 dark:bg-sky-900 dark:text-sky-100' : 'text-muted-foreground hover:text-foreground'}`}>
+            <button type="button" disabled={loginMutation.isPending} aria-pressed={loginMode === 'personal'} onClick={() => setLoginMode('personal')} className={`h-11 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 xl:h-10 ${loginMode === 'personal' ? 'bg-sky-100 text-sky-900 dark:bg-sky-900 dark:text-sky-100' : 'text-muted-foreground hover:text-foreground'}`}>
               {t('login.tabPersonal')}
             </button>
-            <button type="button" aria-pressed={loginMode === 'organization'} onClick={() => setLoginMode('organization')} className={`h-11 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 xl:h-10 ${loginMode === 'organization' ? 'bg-sky-100 text-sky-900 dark:bg-sky-900 dark:text-sky-100' : 'text-muted-foreground hover:text-foreground'}`}>
+            <button type="button" disabled={loginMutation.isPending} aria-pressed={loginMode === 'organization'} onClick={() => setLoginMode('organization')} className={`h-11 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 xl:h-10 ${loginMode === 'organization' ? 'bg-sky-100 text-sky-900 dark:bg-sky-900 dark:text-sky-100' : 'text-muted-foreground hover:text-foreground'}`}>
               {t('login.tabEnterprise')}
             </button>
           </div>
         ) : null}
 
-        {passwordEnabled ? <div hidden={effectiveLoginMode !== 'personal'}>
+        {hasPasswordMethod ? <div hidden={effectiveLoginMode !== 'personal'}>
         <form className="space-y-4" onSubmit={handleSubmit}>
+              {passwordMethods.length > 1 ? (
+                <div role="group" aria-label={t('login.passwordMethod')} className="flex flex-wrap gap-2">
+                  {passwordMethods.map((method) => (
+                    <Button key={method.provider} type="button" variant={selectedProvider === method.provider ? 'default' : 'outline'}
+                      aria-pressed={selectedProvider === method.provider} disabled={loginMutation.isPending}
+                      onClick={() => switchPasswordProvider(method.provider)}>
+                      {method.label}
+                    </Button>
+                  ))}
+                </div>
+              ) : null}
+              {selectedProvider === 'ldap' ? <p className="text-sm text-muted-foreground">{t('login.ldapHint')}</p> : null}
               <div className="space-y-2">
                 <label className="text-sm font-medium" htmlFor="username">{t('login.username')}</label>
                 <div className="relative">
@@ -122,9 +175,9 @@ export function LoginPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-3">
                   <label className="text-sm font-medium" htmlFor="password">{t('login.password')}</label>
-                  <Link to="/reset-password" className="text-sm font-medium text-sky-700 hover:underline dark:text-sky-300">
+                  {isLocalLogin ? <Link to="/reset-password" className="text-sm font-medium text-sky-700 hover:underline dark:text-sky-300">
                     {t('login.forgotPassword')}
-                  </Link>
+                  </Link> : null}
                 </div>
                 <div className="relative">
                   <LockKeyhole aria-hidden="true" className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
@@ -132,8 +185,9 @@ export function LoginPage() {
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="current-password"
-                    value={password}
+                    value={currentPassword}
                     onChange={(event) => {
+                      setCredentialProvider(selectedProvider)
                       setPassword(event.target.value)
                       if (fieldErrors.password) {
                         setFieldErrors((current) => ({ ...current, password: undefined }))
@@ -170,7 +224,7 @@ export function LoginPage() {
         {localCapabilitiesError ? (
           <p className="text-sm text-red-600">{t('systemConfig.capabilitiesUnavailable')}</p>
         ) : null}
-        {localCapabilities && !passwordEnabled && !bootstrapConfig.enabled && !hasExternalMethods ? (
+        {localCapabilities && !hasPasswordMethod && !bootstrapConfig.enabled && !hasExternalMethods ? (
           <p className="text-sm text-muted-foreground">{t('systemConfig.passwordDisabled')}</p>
         ) : null}
 
@@ -194,7 +248,7 @@ export function LoginPage() {
           </section>
         ) : null}
 
-        {localCapabilities?.registrationAvailable ? <p className="text-center text-sm text-muted-foreground">
+        {isLocalLogin && localCapabilities?.registrationAvailable ? <p className="text-center text-sm text-muted-foreground">
           {t('login.noAccount')}
           {' '}
           <Link to="/register" search={{ returnTo }} className="font-medium text-sky-700 hover:underline dark:text-sky-300">

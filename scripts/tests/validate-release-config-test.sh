@@ -71,6 +71,31 @@ write_env "$valid_env" "release-download-secret-32-bytes-minimum"
 printf '%s\n' "SKILLHUB_STORAGE_S3_DISABLE_CHUNKED_ENCODING=true" >>"$valid_env"
 "$SCRIPT" "$valid_env" >/dev/null
 
+# Focused LDAP checks run without Docker; the default suite still validates Compose below.
+ldap_env="$tmp/ldap.env"
+write_env "$ldap_env" "release-download-secret-32-bytes-minimum"
+printf '%s\n' 'SKILLHUB_AUTH_LDAP_ENABLED=true' >>"$ldap_env"
+expect_fail "$ldap_env" 'LDAP requires SKILLHUB_AUTH_DIRECT_ENABLED=true'
+cat >>"$ldap_env" <<'EOF'
+SKILLHUB_AUTH_DIRECT_ENABLED=true
+SKILLHUB_AUTH_LDAP_DIRECTORY_ID=corp
+SKILLHUB_AUTH_LDAP_URL=ldaps://ldap.example.com:636
+SKILLHUB_AUTH_LDAP_BASE_DN=dc=example,dc=com
+SKILLHUB_AUTH_LDAP_BIND_DN=cn=reader,dc=example,dc=com
+SKILLHUB_AUTH_LDAP_BIND_PASSWORD=test-search-secret
+EOF
+"$SCRIPT" "$ldap_env" >/dev/null
+printf '%s\n' 'SKILLHUB_AUTH_LDAP_TLS_MODE=STARTTLS' >>"$ldap_env"
+expect_fail "$ldap_env" 'STARTTLS requires ldap://'
+printf '%s\n' 'SKILLHUB_AUTH_LDAP_URL=ldap://ldap.example.com:389' >>"$ldap_env"
+"$SCRIPT" "$ldap_env" >/dev/null
+printf '%s\n' 'SKILLHUB_AUTH_LDAP_BIND_PASSWORD=' >>"$ldap_env"
+expect_fail "$ldap_env" 'SKILLHUB_AUTH_LDAP_BIND_PASSWORD is required'
+if [[ "${1:-}" == '--ldap-only' ]]; then
+  echo 'LDAP release config tests passed.'
+  exit 0
+fi
+
 compose_default_redirect="$tmp/compose-default-redirect.txt"
 SKILLHUB_DOWNLOAD_ANON_COOKIE_SECRET=release-download-secret-32-bytes-minimum \
 SKILLHUB_PUBLIC_BASE_URL=https://skillhub.example.com \

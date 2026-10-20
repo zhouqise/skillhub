@@ -4,7 +4,7 @@ import { afterEach } from 'vitest'
 import { describe, expect, it, vi } from 'vitest'
 
 const authMethodsFixture = vi.hoisted(() => ({
-  methods: [] as Array<{ id: string, methodType: string }>,
+  methods: [] as Array<{ id: string, methodType: string, provider?: string, displayName?: string }>,
   bootstrapEnabled: false,
   directEnabled: false,
   isError: false,
@@ -13,6 +13,9 @@ const authMethodsFixture = vi.hoisted(() => ({
   mutateAsync: vi.fn(),
   passwordEnabled: true,
   registrationAvailable: true,
+  pending: false,
+  target: undefined as unknown,
+  reset: vi.fn(),
 }))
 
 vi.mock('@tanstack/react-router', () => ({
@@ -74,11 +77,14 @@ vi.mock('@/features/auth/use-local-auth-capabilities', () => ({
 }))
 
 vi.mock('@/features/auth/use-password-login', () => ({
-  usePasswordLogin: () => ({
+  usePasswordLogin: (target: unknown) => {
+    authMethodsFixture.target = target
+    return ({
     mutateAsync: authMethodsFixture.mutateAsync,
-    isPending: false,
+    isPending: authMethodsFixture.pending,
+    reset: authMethodsFixture.reset,
     error: null,
-  }),
+  }) },
 }))
 
 vi.mock('@/shared/ui/button', () => ({
@@ -101,6 +107,8 @@ describe('LoginPage', () => {
     authMethodsFixture.isError = false
     authMethodsFixture.passwordEnabled = true
     authMethodsFixture.registrationAvailable = true
+    authMethodsFixture.pending = false
+    authMethodsFixture.reset.mockClear()
     authMethodsFixture.returnTo = ''
     authMethodsFixture.navigate.mockClear()
     authMethodsFixture.mutateAsync.mockClear()
@@ -208,4 +216,81 @@ describe('LoginPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'login.tabEnterprise' }))
     expect(screen.getByText('session bootstrap').closest('[hidden]')).toBeNull()
   })
+  it('selects LDAP, clears credentials and hides local account actions', () => {
+    authMethodsFixture.methods = [{ id: 'direct-ldap', methodType: 'DIRECT_PASSWORD', provider: 'ldap', displayName: 'LDAP' }]
+    render(<LoginPage />)
+    expect(authMethodsFixture.target).toBe('local')
+    fireEvent.change(screen.getByLabelText('login.password'), { target: { value: 'local-secret' } })
+    fireEvent.click(screen.getByRole('button', { name: 'login.ldapLogin' }))
+    expect(authMethodsFixture.target).toEqual({ provider: 'ldap' })
+    expect((screen.getByLabelText('login.password') as HTMLInputElement).value).toBe('')
+    expect(authMethodsFixture.reset).toHaveBeenCalled()
+    expect(screen.queryByText('login.forgotPassword')).toBeNull()
+    expect(screen.queryByText('login.register')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'login.localLogin' }))
+    expect(authMethodsFixture.target).toBe('local')
+    expect(screen.getByText('login.forgotPassword')).toBeTruthy()
+  })
+
+  it('offers LDAP when ordinary password login is disabled', () => {
+    authMethodsFixture.passwordEnabled = false
+    authMethodsFixture.methods = [{ id: 'direct-ldap', methodType: 'DIRECT_PASSWORD', provider: 'ldap', displayName: 'LDAP' }]
+    render(<LoginPage />)
+    expect(authMethodsFixture.target).toEqual({ provider: 'ldap' })
+    expect(screen.getByRole('button', { name: 'login.submit' })).toBeTruthy()
+    expect(screen.queryByText('systemConfig.passwordDisabled')).toBeNull()
+  })
+
+  it('prevents repeated submissions and switching while login is in flight', async () => {
+    authMethodsFixture.methods = [{ id: 'direct-ldap', methodType: 'DIRECT_PASSWORD', provider: 'ldap', displayName: 'LDAP' }]
+    let resolve!: () => void
+    authMethodsFixture.mutateAsync.mockImplementationOnce(() => new Promise<void>((done) => { resolve = done }))
+    const { rerender } = render(<LoginPage />)
+    fireEvent.change(screen.getByLabelText('login.username'), { target: { value: 'alice' } })
+    fireEvent.change(screen.getByLabelText('login.password'), { target: { value: 'secret' } })
+    fireEvent.click(screen.getByRole('button', { name: 'login.submit' }))
+    fireEvent.click(screen.getByRole('button', { name: 'login.submit' }))
+    fireEvent.click(screen.getByRole('button', { name: 'login.ldapLogin' }))
+    expect(authMethodsFixture.mutateAsync).toHaveBeenCalledOnce()
+    expect(authMethodsFixture.target).toBe('local')
+    authMethodsFixture.pending = true
+    rerender(<LoginPage />)
+    expect((screen.getByRole('button', { name: 'login.ldapLogin' }) as HTMLButtonElement).disabled).toBe(true)
+    resolve()
+    await waitFor(() => expect(authMethodsFixture.navigate).toHaveBeenCalled())
+  })
+
+  it('clears passwords when asynchronous capabilities change the effective provider', () => {
+    authMethodsFixture.passwordEnabled = false
+    authMethodsFixture.methods = [{ id: 'direct-ldap', methodType: 'DIRECT_PASSWORD', provider: 'ldap', displayName: 'LDAP' }]
+    const { rerender } = render(<LoginPage />)
+    fireEvent.change(screen.getByLabelText('login.password'), { target: { value: 'directory-secret' } })
+    authMethodsFixture.passwordEnabled = true
+    rerender(<LoginPage />)
+    expect(authMethodsFixture.target).toBe('local')
+    expect((screen.getByLabelText('login.password') as HTMLInputElement).value).toBe('')
+    fireEvent.change(screen.getByLabelText('login.password'), { target: { value: 'local-secret' } })
+    authMethodsFixture.passwordEnabled = false
+    rerender(<LoginPage />)
+    expect(authMethodsFixture.target).toEqual({ provider: 'ldap' })
+    expect((screen.getByLabelText('login.password') as HTMLInputElement).value).toBe('')
+    expect(authMethodsFixture.mutateAsync).not.toHaveBeenCalled()
+  })
+
+  it('freezes the request provider while capabilities change in flight', async () => {
+    authMethodsFixture.methods = [{ id: 'direct-ldap', methodType: 'DIRECT_PASSWORD', provider: 'ldap', displayName: 'LDAP' }]
+    let resolve!: () => void
+    authMethodsFixture.mutateAsync.mockImplementationOnce(() => new Promise<void>((done) => { resolve = done }))
+    const { rerender } = render(<LoginPage />)
+    fireEvent.change(screen.getByLabelText('login.username'), { target: { value: 'alice' } })
+    fireEvent.change(screen.getByLabelText('login.password'), { target: { value: 'local-secret' } })
+    fireEvent.click(screen.getByRole('button', { name: 'login.submit' }))
+    authMethodsFixture.passwordEnabled = false
+    rerender(<LoginPage />)
+    expect(authMethodsFixture.target).toBe('local')
+    resolve()
+    await waitFor(() => expect(authMethodsFixture.target).toEqual({ provider: 'ldap' }))
+    expect((screen.getByLabelText('login.password') as HTMLInputElement).value).toBe('')
+  })
+
 })

@@ -320,6 +320,24 @@ validate_boolean SKILLHUB_STORAGE_S3_AUTO_CREATE_BUCKET
 validate_boolean SPRING_DATA_REDIS_SSL_ENABLED
 validate_boolean SKILLHUB_REDIS_SENTINEL_CHECK_SENTINELS_LIST
 
+validate_boolean SKILLHUB_AUTH_DIRECT_ENABLED
+validate_boolean SKILLHUB_AUTH_LDAP_ENABLED
+if [ "${SKILLHUB_AUTH_LDAP_ENABLED:-false}" = "true" ]; then
+  if [ "${SKILLHUB_AUTH_DIRECT_ENABLED:-false}" != "true" ]; then
+    error "LDAP requires SKILLHUB_AUTH_DIRECT_ENABLED=true"
+  fi
+  for ldap_required in DIRECTORY_ID URL BASE_DN BIND_DN BIND_PASSWORD; do
+    require_non_empty "SKILLHUB_AUTH_LDAP_$ldap_required"
+  done
+  case "${SKILLHUB_AUTH_LDAP_TLS_MODE:-LDAPS}" in
+    LDAPS)
+      case "${SKILLHUB_AUTH_LDAP_URL:-}" in ldaps://*) ;; *) error "LDAP LDAPS requires ldaps://" ;; esac ;;
+    STARTTLS|PLAIN)
+      case "${SKILLHUB_AUTH_LDAP_URL:-}" in ldap://*) ;; *) error "LDAP STARTTLS requires ldap:// (also required for PLAIN)" ;; esac ;;
+    *) error "SKILLHUB_AUTH_LDAP_TLS_MODE must be LDAPS, STARTTLS or PLAIN" ;;
+  esac
+fi
+
 validate_port POSTGRES_PORT
 validate_port REDIS_PORT
 validate_port API_PORT

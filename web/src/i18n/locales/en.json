@@ -328,6 +328,10 @@
     "clear": "Clear search"
   },
   "login": {
+    "localLogin": "Ordinary login",
+    "ldapLogin": "LDAP login",
+    "passwordMethod": "Login method",
+    "ldapHint": "Sign in with your company directory account and password.",
     "title": "Login to SkillHub",
     "subtitle": "One account for better skill collaboration",
     "eyebrow": "Welcome back",

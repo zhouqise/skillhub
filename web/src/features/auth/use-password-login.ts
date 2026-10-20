@@ -6,14 +6,17 @@ import { clearSessionScopedQueries } from '@/features/notification/notification-
 
 /**
  * Password-login mutation that can switch between local auth and direct upstream auth based on
- * runtime configuration.
+ * runtime configuration when the caller does not specify a target.
+ * An explicit local target never inherits the global upstream provider.
  */
-export function usePasswordLogin() {
+export function usePasswordLogin(target?: 'local' | { provider: string }) {
   const queryClient = useQueryClient()
   const directAuthConfig = getDirectAuthRuntimeConfig()
 
   return useMutation({
     mutationFn: (request: LocalLoginRequest) => {
+      if (target === 'local') return authApi.localLogin(request)
+      if (target) return authApi.directLogin(target.provider, request)
       if (directAuthConfig.enabled && directAuthConfig.provider) {
         return authApi.directLogin(directAuthConfig.provider, request)
       }

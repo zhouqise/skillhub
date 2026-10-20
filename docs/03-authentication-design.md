@@ -753,3 +753,35 @@ Spring Security 先加载 Web Session 身份，共享 API token 过滤器随后�
 | `GET /api/v1/resolve` | 可选（匿名仅限 `PUBLIC`、`ACTIVE`、非 hidden、命名空间未归档且目标版本可安装） | visibility + namespace status + `SkillInstallability` |
 | `GET /api/v1/download/{slug}/{version}` | 可选（匿名仅限 `PUBLIC`、`ACTIVE`、非 hidden、命名空间未归档且目标版本可安装） | visibility + namespace status + `SkillInstallability` |
 | `POST /api/v1/publish` | Bearer Token + `skill:publish` | 普通用户要求目标 namespace 成员；`SUPER_ADMIN` 可绕过（namespace 由 canonical slug 解析） |
+
+## LDAP 密码登录
+
+LDAP 是可选的 `DirectAuthProvider`（provider 固定为 `ldap`），默认关闭。
+同时启用 `skillhub.auth.direct.enabled` 和 `skillhub.auth.ldap.enabled` 后，
+`GET /api/v1/auth/methods` 返回 `DIRECT_PASSWORD` 方法。登录页展示普通登录和 LDAP 登录，
+普通登录始终调用本地登录接口；LDAP 使用 `POST /api/v1/auth/direct/login`，请求字段为
+`provider: "ldap"`、`username`、`password`。请求仍受 CSRF、登录限流和既有会话轮换约束。
+LDAP 故障不会回退普通登录。切换方式时清除密码与错误提示，LDAP 模式不展示本地注册或找回密码入口。
+
+目录认证先以只读搜索账号在配置的子树中查找唯一用户，再以该用户的完整 DN 和原始密码绑定，
+并从认证后的上下文读取稳定属性。用户名按 LDAP filter 规则转义；空密码在网络请求前拒绝。
+多匹配、错误凭证返回 401；目录连接、TLS、搜索账号、超时、部分结果或稳定属性异常返回 503；
+平台准入或账号状态拒绝返回 403。客户端不获得原始目录错误、DN 或搜索账号秘密。
+
+平台绑定使用下列 subject，不依赖可变登录名或 DN：
+
+- OpenLDAP：`<directory-id>:entryuuid:<规范 UUID>`。
+- Active Directory：`<directory-id>:objectguid:<原始 16 字节的小写十六进制>`。这是原始字节编码，不能直接替换成 AD 控制台展示的 GUID 字符串。
+
+`directory-id` 是持久身份命名空间，首次开户后不能随意修改。`ldap` 不能同时作为 OAuth/OIDC 注册名。
+LDAP 不提供邮箱权威或角色声明；不会按同名或相同邮箱合并账号，也不会消费按验证邮箱预授的管理员权限。
+在 OPEN 准入策略下，首次成功认证自动创建 ACTIVE 普通 USER 账号，不创建本地密码。
+回访复用精确绑定，保留平台角色与禁用状态。共享 `ExternalIdentityAuthenticationService`
+保持 OAuth 的原准入和身份核心行为，账号写入/并发冲突重读继续由 `IdentityBindingService` 独立事务负责。
+目录网络访问在平台事务外进行。
+
+现有准入策略仍有效。SUBJECT_WHITELIST 的精确身份键必须包含 provider，
+例如 `ldap:corp:entryuuid:550e8400-e29b-41d4-a716-446655440000`；
+LDAP 不带已验证邮箱，不能依赖邮箱域名准入。若策略要求审批，账户仍遵循已有审批流程。
+关闭 LDAP 只移除登录入口，不删除已创建账号或绑定。无数据库迁移。
+部署参数及目录 ACL 要求见 [部署文档](09-deployment.md#ldap-登录配置)。

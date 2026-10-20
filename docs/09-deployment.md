@@ -743,3 +743,80 @@ Flyway 仍是唯一 schema 变更入口：
 - 路径：`server/skillhub-app/src/main/resources/db/migration/`
 - 命名：`V{version}__{description}.sql`
 - 启动策略：应用容器启动时自动执行迁移
+
+## LDAP 登录配置
+
+默认关闭。保留普通登录作为独立入口；不需要将 `SKILLHUB_WEB_AUTH_DIRECT_PROVIDER` 改为 `ldap`。
+启用 LDAP 必须同时设置 `SKILLHUB_AUTH_DIRECT_ENABLED=true`。配置在启动时做结构校验，
+不会为了启动检查连接目录。设置变更后重启后端；方法目录会控制前端 LDAP 选项。
+
+OpenLDAP 示例（实际秘密由部署环境注入）：
+
+```dotenv
+SKILLHUB_AUTH_DIRECT_ENABLED=true
+SKILLHUB_AUTH_LDAP_ENABLED=true
+SKILLHUB_AUTH_LDAP_DIRECTORY_ID=corp
+SKILLHUB_AUTH_LDAP_URL=ldaps://ldap.example.com:636
+SKILLHUB_AUTH_LDAP_TLS_MODE=LDAPS
+SKILLHUB_AUTH_LDAP_BASE_DN=dc=example,dc=com
+SKILLHUB_AUTH_LDAP_BIND_DN=cn=skillhub-reader,ou=services,dc=example,dc=com
+SKILLHUB_AUTH_LDAP_BIND_PASSWORD=<搜索账号密码>
+SKILLHUB_AUTH_LDAP_USER_SEARCH_BASE=ou=people
+SKILLHUB_AUTH_LDAP_USER_FILTER=(uid={0})
+SKILLHUB_AUTH_LDAP_SUBJECT_ATTRIBUTE=entryUUID
+SKILLHUB_AUTH_LDAP_DISPLAY_NAME_ATTRIBUTE=cn
+```
+
+Active Directory 使用同一套连接参数，将搜索范围和映射改为适合本域的值：
+
+```dotenv
+SKILLHUB_AUTH_LDAP_USER_SEARCH_BASE=ou=Employees
+SKILLHUB_AUTH_LDAP_USER_FILTER=(&(objectClass=user)(sAMAccountName={0}))
+SKILLHUB_AUTH_LDAP_SUBJECT_ATTRIBUTE=objectGUID
+SKILLHUB_AUTH_LDAP_DISPLAY_NAME_ATTRIBUTE=displayName
+```
+
+`USER_SEARCH_BASE` 是相对 `BASE_DN` 的 DN，可以为空；搜索覆盖整个子树。
+`USER_FILTER` 必须包含 `{0}`，该位置由服务端填入转义后的登录名。不要拼入密码。
+搜索账号需能搜索目标子树；用户自身需能在绑定后读取自己的 `entryUUID`/`objectGUID` 和展示名。
+稳定属性必须存在且唯一。属性不可读、目录只返回部分匹配结果或引用其他目录都会拒绝登录，不会挑选第一条。
+建议先用测试账号确认目录 ACL，再开放入口。
+
+TLS 模式：
+
+- `LDAPS`（默认）：URL 必须为 `ldaps://主机:端口`。
+- `STARTTLS`：使用 `ldap://主机:端口`，先建立 TLS，再发送绑定凭证；协商失败不降级。
+- `PLAIN`：仅用于隔离开发目录，用户名和密码在网络上无 TLS 保护。
+
+URL 只允许单个主机，不得包含账号、密码、路径、查询或 fragment。证书必须匹配 URL 主机名，
+并被 JVM 信任。企业 CA 可导入专用 truststore，再只读挂载进服务容器，
+通过 JVM 参数 `-Djavax.net.ssl.trustStore=/run/ldap/truststore.p12`
+及相应 `trustStorePassword` 配置。发布 Compose 本身不挂载 CA；请使用部署 override 增加该只读挂载和
+`JAVA_TOOL_OPTIONS`。不要关闭证书验证或使用 trust-all。JVM truststore 设置对该 JVM 的其他 TLS 连接也有效。
+
+连接、读取、搜索时限环境变量分别为 `SKILLHUB_AUTH_LDAP_CONNECT_TIMEOUT_MS`（3000）、
+`SKILLHUB_AUTH_LDAP_READ_TIMEOUT_MS`（5000）、`SKILLHUB_AUTH_LDAP_SEARCH_TIME_LIMIT_MS`（5000）；
+单位毫秒，允许 1–30000。`DIRECTORY_ID` 允许小写字母、数字、下划线及连字符，长度 1–32，首字符必须为字母或数字。
+它和稳定属性类型共同决定历史绑定身份；改动会被视为另一身份，不能用于日常重命名目录。
+
+默认 OPEN 策略下，首登自动创建普通账号并登录；不会授予管理员，也不会与同名/同邮箱本地账号合并。
+若部署使用 SUBJECT_WHITELIST，应填写完整键，例如 `ldap:corp:entryuuid:550e8400-e29b-41d4-a716-446655440000`。
+LDAP 不同步邮箱，因此不能使用邮箱域名策略允许 LDAP 用户。已有禁用账号仍拒绝登录。
+
+发布前运行 `scripts/validate-release-config.sh .env.release`；聚焦配置回归可运行
+`bash scripts/tests/validate-release-config-test.sh --ldap-only`，完整脚本还需要 Docker Compose。
+在隔离环境验证成功首登、回访、错误密码、目录不可用、证书拒绝及禁用账号。
+回退时设置 `SKILLHUB_AUTH_LDAP_ENABLED=false` 并重启服务，普通登录可继续使用；账号和绑定保留，无 DDL 回滚。
+
+白名单使用准确的模式名和属性键（未知模式在现有实现中会回到 OPEN，因此不要简写）：
+
+```yaml
+skillhub:
+  access-policy:
+    mode: SUBJECT_WHITELIST
+    whitelisted-subjects:
+      - ldap:corp:entryuuid:550e8400-e29b-41d4-a716-446655440000
+```
+
+将配置通过部署的 Spring 配置文件或 `SPRING_APPLICATION_JSON` 传入；Compose override 需显式传递该配置。
+只允许列入名单的完整身份键，其余目录用户拒绝访问。

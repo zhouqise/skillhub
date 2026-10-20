@@ -1,20 +1,16 @@
 package com.iflytek.skillhub.auth.oauth;
 
 import com.iflytek.skillhub.auth.federation.adapter.RemoteIdentityIoExecutor;
-import com.iflytek.skillhub.auth.federation.core.IdentityCoreMode;
-import com.iflytek.skillhub.auth.federation.core.IdentityLoginResolution;
 import com.iflytek.skillhub.auth.identity.IdentityBindingService;
-import com.iflytek.skillhub.auth.policy.AccessDecision;
+import com.iflytek.skillhub.auth.identity.ExternalIdentityAuthenticationService;
 import com.iflytek.skillhub.auth.policy.AccessPolicy;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
-import com.iflytek.skillhub.domain.user.UserStatus;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -41,28 +37,17 @@ public class OAuthLoginFlowService {
 
     private final Map<String, OAuthClaimsExtractor> extractors;
     private final Map<String, ProviderOAuth2UserService> userServiceOverrides;
-    private final AccessPolicy accessPolicy;
-    private final IdentityBindingService identityBindingService;
-    private final LegacyPlatformIdentityCore identityCore;
+    private final ExternalIdentityAuthenticationService externalIdentityAuthenticationService;
     private final OAuth2UserService<OAuth2UserRequest, OAuth2User> delegate;
     private final RemoteIdentityIoExecutor remoteIdentityIo;
 
     @Autowired
     public OAuthLoginFlowService(List<OAuthClaimsExtractor> extractorList,
                                  List<ProviderOAuth2UserService> userServiceList,
-                                 AccessPolicy accessPolicy,
-                                 IdentityBindingService identityBindingService,
-                                 LegacyPlatformIdentityCore identityCore,
+                                 ExternalIdentityAuthenticationService externalIdentityAuthenticationService,
                                  RemoteIdentityIoExecutor remoteIdentityIo) {
-        this(
-                extractorList,
-                userServiceList,
-                accessPolicy,
-                identityBindingService,
-                identityCore,
-                new DefaultOAuth2UserService(),
-                remoteIdentityIo
-        );
+        this(extractorList, userServiceList, externalIdentityAuthenticationService,
+                new DefaultOAuth2UserService(), remoteIdentityIo);
     }
 
     OAuthLoginFlowService(List<OAuthClaimsExtractor> extractorList,
@@ -72,13 +57,21 @@ public class OAuthLoginFlowService {
                           LegacyPlatformIdentityCore identityCore,
                           OAuth2UserService<OAuth2UserRequest, OAuth2User> delegate,
                           RemoteIdentityIoExecutor remoteIdentityIo) {
+        this(extractorList, userServiceList,
+                new ExternalIdentityAuthenticationService(accessPolicy, identityBindingService, identityCore),
+                delegate, remoteIdentityIo);
+    }
+
+    private OAuthLoginFlowService(List<OAuthClaimsExtractor> extractorList,
+                                  List<ProviderOAuth2UserService> userServiceList,
+                                  ExternalIdentityAuthenticationService externalIdentityAuthenticationService,
+                                  OAuth2UserService<OAuth2UserRequest, OAuth2User> delegate,
+                                  RemoteIdentityIoExecutor remoteIdentityIo) {
         this.extractors = extractorList.stream()
                 .collect(Collectors.toMap(OAuthClaimsExtractor::getProvider, Function.identity()));
         this.userServiceOverrides = userServiceList.stream()
                 .collect(Collectors.toMap(ProviderOAuth2UserService::getProvider, Function.identity()));
-        this.accessPolicy = accessPolicy;
-        this.identityBindingService = identityBindingService;
-        this.identityCore = identityCore;
+        this.externalIdentityAuthenticationService = externalIdentityAuthenticationService;
         this.delegate = delegate;
         this.remoteIdentityIo = remoteIdentityIo;
     }
@@ -130,46 +123,13 @@ public class OAuthLoginFlowService {
         return new AuthenticatedLoginContext(loadedIdentity.upstreamUser(), principal);
     }
 
+    /**
+     * 将已验证的 OAuth/OIDC 属性交给共享平台身份编排。
+     *
+     * <p>保留原有异常契约；会话仍由成功回调建立。
+     */
     public PlatformPrincipal authenticate(OAuthClaims claims) {
-        AccessDecision decision = accessPolicy.evaluate(claims);
-
-        log.info("OAuth access policy evaluated: provider={}, decision={}", claims.provider(), decision);
-        if (decision == AccessDecision.PENDING_APPROVAL) {
-            LegacyPlatformIdentityDecision identityDecision = identityCore.evaluate(claims);
-            ensureActiveCoreAllowsPlatformLogin(identityDecision);
-            identityBindingService.createPendingUserIfAbsent(claims);
-            throw new AccountPendingException();
-        }
-        if (decision == AccessDecision.DENY) {
-            throw new OAuth2AuthenticationException(
-                    new OAuth2Error("access_denied", "Access denied by policy", null)
-            );
-        }
-
-        LegacyPlatformIdentityDecision identityDecision = identityCore.evaluate(claims);
-        ensureActiveCoreAllowsPlatformLogin(identityDecision);
-        return identityBindingService.bindOrCreate(claims, UserStatus.ACTIVE);
-    }
-
-    private static void ensureActiveCoreAllowsPlatformLogin(LegacyPlatformIdentityDecision decision) {
-        Objects.requireNonNull(decision, "identity decision must not be null");
-        if (decision.mode() != IdentityCoreMode.ACTIVE) {
-            return;
-        }
-        IdentityLoginResolution resolution = decision.resolution()
-                .orElseThrow(() -> new OAuthIdentityCoreException(
-                        new IllegalStateException("ACTIVE mode requires a unified identity resolution")
-                ));
-        if (resolution instanceof IdentityLoginResolution.Matched matched
-                && matched.target().userId().isPresent()) {
-            return;
-        }
-        if (resolution instanceof IdentityLoginResolution.ProvisionNew) {
-            return;
-        }
-        throw new OAuthIdentityCoreException(
-                new IllegalStateException("Unified identity denied platform OAuth login")
-        );
+        return externalIdentityAuthenticationService.authenticate(claims);
     }
 
     public void rememberReturnTo(HttpServletRequest request) {

@@ -328,6 +328,10 @@
     "clear": "清空搜索"
   },
   "login": {
+    "localLogin": "普通登录",
+    "ldapLogin": "LDAP 登录",
+    "passwordMethod": "登录方式",
+    "ldapHint": "使用公司的目录账号和密码登录。",
     "title": "登录 SkillHub",
     "subtitle": "一个账号，开启更高效的技能协作",
     "eyebrow": "欢迎回来",
