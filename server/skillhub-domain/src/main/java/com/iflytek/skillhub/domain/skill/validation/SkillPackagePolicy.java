@@ -29,6 +29,8 @@ public final class SkillPackagePolicy {
             ".lua", ".sql", ".r", ".bat", ".ps1", ".zsh", ".bash",
             // Images
             ".png", ".jpg", ".jpeg", ".svg", ".gif", ".webp", ".ico",
+            // Bundled runtime archives
+            ".tar.gz",
             // Office documents
             ".doc", ".xls", ".ppt", ".docx", ".xlsx", ".pptx"
     );

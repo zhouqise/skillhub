@@ -83,6 +83,24 @@ class SkillPackageValidatorTest {
     }
 
     @Test
+    void acceptsBundledTarGzRuntimeWithoutWarnings() throws java.io.IOException {
+        var compressed = new java.io.ByteArrayOutputStream();
+        try (var gzip = new java.util.zip.GZIPOutputStream(compressed)) {
+            // A valid empty tar archive consists of two zero-filled blocks.
+            gzip.write(new byte[1024]);
+        }
+        byte[] runtime = compressed.toByteArray();
+        for (String path : List.of("runtime/linux-arm64.tar.gz", "runtime/LINUX-AMD64.TAR.GZ")) {
+            ValidationResult result = validator.validate(List.of(
+                    skillMdEntry(),
+                    new PackageEntry(path, runtime, runtime.length, "application/gzip")));
+            assertTrue(result.passed());
+            assertTrue(result.errors().isEmpty());
+            assertTrue(result.warnings().isEmpty(), result.warnings().toString());
+        }
+    }
+
+    @Test
     void testDisallowedExtension() {
         String skillMdContent = """
             ---
