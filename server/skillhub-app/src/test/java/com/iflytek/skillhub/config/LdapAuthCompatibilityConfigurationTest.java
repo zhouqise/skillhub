@@ -6,9 +6,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class LdapAuthCompatibilityConfigurationTest {
     @Test
-    void cannotEnableLdapWithoutDirectEntry() {
-        assertThatThrownBy(() -> new LdapAuthCompatibilityConfiguration(new DirectAuthProperties(), new OAuth2ClientProperties()))
-                .isInstanceOf(IllegalArgumentException.class);
+    void ldapCanUseItsOwnSwitchWithoutEnablingOtherDirectProviders() {
+        org.assertj.core.api.Assertions.assertThatCode(() -> new LdapAuthCompatibilityConfiguration(new DirectAuthProperties(), new OAuth2ClientProperties()))
+                .doesNotThrowAnyException();
     }
 
     @org.junit.jupiter.params.ParameterizedTest

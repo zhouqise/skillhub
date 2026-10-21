@@ -585,3 +585,11 @@ Parts:
 生成两份独立的 OpenAPI spec：
 - `openapi-native.json`：skillhub Native API，用于前端 SDK 生成
 - `openapi-compat-clawhub.json`：ClawHub 兼容层 API，用于兼容性测试和文档
+
+### LDAP 管理接口
+
+`SUPER_ADMIN` 专属：`GET/PUT /api/v1/admin/auth/ldap` 和
+`POST /api/v1/admin/auth/ldap/test`。写请求沿用会话 CSRF 规则。
+更新/测试请求为 `{version, configuration}`，首次版本 `-1`，版本冲突 `409`，
+配置错误/连接测试失败 `400`；密码只写，空密码表示保留。
+字段、动态生效、加密密钥及身份锁定规则见 [认证设计](03-authentication-design.md#管理-ldap-配置)。

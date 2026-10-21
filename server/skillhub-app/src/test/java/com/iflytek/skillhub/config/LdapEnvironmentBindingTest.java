@@ -17,6 +17,7 @@ class LdapEnvironmentBindingTest {
         new ApplicationContextRunner()
             .withInitializer(new ConfigDataApplicationContextInitializer())
             .withUserConfiguration(LdapAuthenticationConfiguration.class)
+            .withBean(com.iflytek.skillhub.auth.ldap.LdapSettingsService.class, () -> mock(com.iflytek.skillhub.auth.ldap.LdapSettingsService.class))
             .withBean(RemoteIdentityIoExecutor.class, () -> mock(RemoteIdentityIoExecutor.class))
             .withBean(ExternalIdentityAuthenticationService.class, () -> mock(ExternalIdentityAuthenticationService.class))
             .withPropertyValues("SKILLHUB_AUTH_LDAP_ENABLED=true", "SKILLHUB_AUTH_LDAP_DIRECTORY_ID=corp",

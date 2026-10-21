@@ -26,14 +26,24 @@ import org.springframework.ldap.support.LdapEncoder;
  * 分阶段分类；不跟随引用、不接受部分结果、不反序列化目录对象，并始终关闭上下文。
  */
 public class LdapDirectoryAuthenticator {
+    private final java.util.function.Supplier<LdapAuthProperties> settings;
     private final LdapContextSource ldapContextSource;
     private final LdapAuthProperties ldapAuthProperties;
     private final RemoteIdentityIoExecutor remoteIdentityIoExecutor;
 
     public LdapDirectoryAuthenticator(LdapContextSource ldapContextSource,
             LdapAuthProperties ldapAuthProperties, RemoteIdentityIoExecutor remoteIdentityIoExecutor) {
+        this.settings = null;
         this.ldapContextSource = ldapContextSource;
         this.ldapAuthProperties = ldapAuthProperties;
+        this.remoteIdentityIoExecutor = remoteIdentityIoExecutor;
+    }
+
+    public LdapDirectoryAuthenticator(java.util.function.Supplier<LdapAuthProperties> settings,
+            RemoteIdentityIoExecutor remoteIdentityIoExecutor) {
+        this.settings = settings;
+        this.ldapContextSource = null;
+        this.ldapAuthProperties = null;
         this.remoteIdentityIoExecutor = remoteIdentityIoExecutor;
     }
 
@@ -46,6 +56,22 @@ public class LdapDirectoryAuthenticator {
      * @throws AuthFlowException 400 参数非法、401 凭证不可用、503 目录故障
      */
     public LdapIdentity authenticate(String username, String password) {
+        if (settings != null) {
+            LdapAuthProperties snapshot;
+            try { snapshot = settings.get(); }
+            catch (RuntimeException unavailable) {
+                throw new AuthFlowException(HttpStatus.SERVICE_UNAVAILABLE, "error.auth.ldap.unavailable");
+            }
+            if (!snapshot.isEnabled()) throw new AuthFlowException(HttpStatus.FORBIDDEN, "error.auth.direct.disabled");
+            try {
+                snapshot.validate();
+                LdapContextSource source = LdapAuthenticationConfiguration.createContextSource(snapshot);
+                source.afterPropertiesSet();
+                return new LdapDirectoryAuthenticator(source, snapshot, remoteIdentityIoExecutor).authenticate(username, password);
+            } catch (IllegalArgumentException invalid) {
+                throw new AuthFlowException(HttpStatus.SERVICE_UNAVAILABLE, "error.auth.ldap.unavailable");
+            }
+        }
         if (username == null || username.isBlank() || username.trim().length() > 256
                 || password == null || password.isBlank() || password.length() > 4096) {
             throw new AuthFlowException(HttpStatus.BAD_REQUEST, "error.auth.ldap.invalidRequest");

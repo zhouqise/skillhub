@@ -71,7 +71,7 @@ class LdapTlsTest {
     }
 
     private static LdapDirectoryAuthenticator authenticator(LdapAuthProperties p) throws Exception {
-        LdapContextSource source = new LdapAuthenticationConfiguration().ldapAuthContextSource(p);
+        LdapContextSource source = LdapAuthenticationConfiguration.createContextSource(p);
         source.afterPropertiesSet();
         return new LdapDirectoryAuthenticator(source, p, new RemoteIdentityIoExecutor() {
             @Override

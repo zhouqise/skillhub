@@ -61,8 +61,27 @@ class LdapDirectoryAuthenticatorTest {
         return p;
     }
 
+    @Test
+    void dynamicSnapshotsEnableDisableAndChangeConnectionWithoutRestart() {
+        java.util.concurrent.atomic.AtomicReference<LdapAuthProperties> current = new java.util.concurrent.atomic.AtomicReference<>(properties);
+        LdapDirectoryAuthenticator dynamic = new LdapDirectoryAuthenticator(current::get, new RemoteIdentityIoExecutor() {
+            public <T> T execute(Supplier<T> action) { return action.get(); }
+        });
+        assertThat(dynamic.authenticate("alice", "user-secret").subject()).contains(ID);
+        LdapAuthProperties disabled = new LdapAuthProperties();
+        current.set(disabled);
+        assertThatThrownBy(() -> dynamic.authenticate("alice", "user-secret"))
+                .isInstanceOf(AuthFlowException.class).hasMessageContaining("disabled");
+        LdapAuthProperties changed = properties(server.getListenPort());
+        changed.setBindPassword("wrong-secret");
+        current.set(changed);
+        assertThatThrownBy(() -> dynamic.authenticate("alice", "user-secret")).isInstanceOf(AuthFlowException.class);
+        current.set(properties);
+        assertThat(dynamic.authenticate("alice", "user-secret").subject()).contains(ID);
+    }
+
     private LdapDirectoryAuthenticator authenticator() throws Exception {
-        LdapContextSource source = new LdapAuthenticationConfiguration().ldapAuthContextSource(properties);
+        LdapContextSource source = LdapAuthenticationConfiguration.createContextSource(properties);
         source.afterPropertiesSet();
         return new LdapDirectoryAuthenticator(source, properties, new RemoteIdentityIoExecutor() {
             @Override

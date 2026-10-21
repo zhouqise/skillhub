@@ -22,6 +22,7 @@ interface SidebarItem {
   icon: React.ComponentType<{ className?: string }>
   label: string
   to: string
+  superAdmin?: boolean
   admin?: boolean
   passwordCapability?: boolean
   badge?: string
@@ -38,6 +39,7 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
     items: [
       { key: 'profile', icon: UserCog, label: 'sidebar.profile', to: '/settings/profile' },
       { key: 'security', icon: Lock, label: 'sidebar.security', to: '/settings/security', passwordCapability: true },
+      { key: 'ldap', icon: Shield, label: 'ldapSettings.title', to: '/settings/ldap', superAdmin: true },
       { key: 'notifications', icon: Bell, label: 'sidebar.notifications', to: '/settings/notifications' },
     ],
   },
@@ -65,12 +67,13 @@ export const SIDEBAR_GROUPS: SidebarGroup[] = [
 // Flatten for backward compatibility with layout.tsx
 const SIDEBAR_NAV_ITEMS = SIDEBAR_GROUPS.flatMap((g) => g.items)
 
-export const SIDEBAR_NAV = SIDEBAR_NAV_ITEMS.map(({ key, icon, label, to, admin, passwordCapability }) => ({
+export const SIDEBAR_NAV = SIDEBAR_NAV_ITEMS.map(({ key, icon, label, to, admin, superAdmin, passwordCapability }) => ({
   key,
   icon,
   label,
   to,
   admin,
+  superAdmin,
   passwordCapability,
   exact: false,
 }))
@@ -101,6 +104,7 @@ export function DashboardPage() {
       ...group,
       items: group.items.filter((item) => (
         (!item.admin || governanceVisible)
+        && (!item.superAdmin || user?.platformRoles?.includes('SUPER_ADMIN'))
         && (!item.passwordCapability || user?.canChangePassword === true)
       )),
     }))

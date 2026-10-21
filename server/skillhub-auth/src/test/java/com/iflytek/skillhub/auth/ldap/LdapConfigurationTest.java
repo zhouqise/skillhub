@@ -10,13 +10,14 @@ import static org.mockito.Mockito.mock;
 class LdapConfigurationTest {
     private final ApplicationContextRunner context = new ApplicationContextRunner()
             .withUserConfiguration(LdapAuthenticationConfiguration.class)
+            .withBean(LdapSettingsService.class, () -> mock(LdapSettingsService.class))
             .withBean(RemoteIdentityIoExecutor.class, () -> mock(RemoteIdentityIoExecutor.class))
             .withBean(ExternalIdentityAuthenticationService.class, () -> mock(ExternalIdentityAuthenticationService.class));
 
     @Test
     void disabledFeatureDoesNotCreateAnyDirectoryConnection() {
-        context.run(result -> assertThat(result).doesNotHaveBean(LdapDirectAuthProvider.class)
-                .doesNotHaveBean(LdapDirectoryAuthenticator.class));
+        context.run(result -> assertThat(result).hasSingleBean(LdapDirectAuthProvider.class)
+                .doesNotHaveBean(org.springframework.ldap.core.support.LdapContextSource.class));
     }
 
     @Test
@@ -28,8 +29,8 @@ class LdapConfigurationTest {
     }
 
     @Test
-    void enabledIncompleteConfigurationFailsClosed() {
+    void incompleteConfigurationDoesNotPreventLocalLoginStartup() {
         context.withPropertyValues("skillhub.auth.ldap.enabled=true")
-                .run(result -> assertThat(result).hasFailed());
+                .run(result -> assertThat(result).hasNotFailed());
     }
 }

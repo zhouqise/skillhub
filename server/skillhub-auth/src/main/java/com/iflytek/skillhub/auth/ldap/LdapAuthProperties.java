@@ -34,6 +34,14 @@ public class LdapAuthProperties {
      * @throws IllegalArgumentException 配置非法；消息仅含字段类别，不含秘密
      */
     public void validate() {
+        for (String value : new String[]{directoryId, url, tlsMode, baseDn, bindDn, userSearchBase,
+                userFilter, subjectAttribute, displayNameAttribute}) {
+            require(value != null && value.length() <= 2048, "field-length");
+        }
+        require(bindPassword != null && bindPassword.length() <= 4096, "bind-password");
+        require(connectTimeoutMs > 0 && connectTimeoutMs <= 30000, "connect-timeout-ms");
+        require(readTimeoutMs > 0 && readTimeoutMs <= 30000, "read-timeout-ms");
+        require(searchTimeLimitMs > 0 && searchTimeLimitMs <= 30000, "search-time-limit-ms");
         if (!enabled) {
             return;
         }
@@ -90,6 +98,7 @@ public class LdapAuthProperties {
     public void setBaseDn(String value) { this.baseDn = value; }
     public String getBindDn() { return bindDn; }
     public void setBindDn(String value) { this.bindDn = value; }
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
     public String getBindPassword() { return bindPassword; }
     public void setBindPassword(String value) { this.bindPassword = value; }
     public String getUserSearchBase() { return userSearchBase; }

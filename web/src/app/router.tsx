@@ -198,6 +198,7 @@ const NotificationSettingsPage = createLazyRouteComponent(
   'NotificationSettingsPage',
   dashboardRouteOptions,
 )
+const LdapSettingsPage = createRoleProtectedRouteComponent(() => import('@/pages/settings/ldap'), 'LdapSettingsPage', ['SUPER_ADMIN'])
 const AdminUsersPage = createRoleProtectedRouteComponent(
   () => import('@/pages/admin/users'),
   'AdminUsersPage',
@@ -633,6 +634,8 @@ const deviceAuthRoute = createRoute({
   component: DeviceAuthPage,
 })
 
+const settingsLdapRoute = createRoute({ getParentRoute: () => rootRoute, path: 'settings/ldap', beforeLoad: requireAuth, component: LdapSettingsPage })
+
 const settingsSecurityRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'settings/security',
@@ -740,6 +743,7 @@ const routeTree = rootRoute.addChildren([
   dashboardTokensRoute,
   cliAuthRoute,
   deviceAuthRoute,
+  settingsLdapRoute,
   settingsSecurityRoute,
   settingsProfileRoute,
   settingsNotificationsRoute,

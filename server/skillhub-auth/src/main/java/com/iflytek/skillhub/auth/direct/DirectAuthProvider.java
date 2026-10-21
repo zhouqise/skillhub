@@ -6,6 +6,8 @@ import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
  * Extension point for username/password style direct authentication sources.
  */
 public interface DirectAuthProvider {
+    default boolean enabled() { return true; }
+
 
     String providerCode();
 

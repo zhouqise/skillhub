@@ -608,6 +608,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/auth/ldap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getLdapSettings"];
+        put: operations["saveLdapSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/suites/{suiteId}/versions/{versionId}/yank": {
         parameters: {
             query?: never;
@@ -3175,6 +3191,22 @@ export interface paths {
         get: operations["listLabels_2"];
         put?: never;
         post: operations["createLabel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/auth/ldap/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["testLdapConnection"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6592,6 +6624,48 @@ export interface components {
             timestamp?: string;
             requestId?: string;
         };
+        LdapAuthProperties: {
+            enabled?: boolean;
+            directoryId?: string;
+            url?: string;
+            tlsMode?: string;
+            baseDn?: string;
+            bindDn?: string;
+            bindPassword?: string;
+            userSearchBase?: string;
+            userFilter?: string;
+            subjectAttribute?: string;
+            displayNameAttribute?: string;
+            /** Format: int32 */
+            connectTimeoutMs?: number;
+            /** Format: int32 */
+            readTimeoutMs?: number;
+            /** Format: int32 */
+            searchTimeLimitMs?: number;
+        };
+        LdapSettingsUpdateRequest: {
+            /** Format: int64 */
+            version: number;
+            configuration: components["schemas"]["LdapAuthProperties"];
+        };
+        ApiResponseLdapSettingsResponse: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["LdapSettingsResponse"];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        LdapSettingsResponse: {
+            /** Format: int64 */
+            version: number;
+            configuration: components["schemas"]["LdapAuthProperties"];
+            passwordConfigured?: boolean;
+            encryptionConfigured?: boolean;
+            identityLocked?: boolean;
+            source?: string;
+        };
         SkillSuiteReasonRequest: {
             reason: string;
         };
@@ -7452,6 +7526,15 @@ export interface components {
             sortOrder?: number;
             translations: components["schemas"]["LabelTranslationItemRequest"][];
         };
+        ApiResponseBoolean: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: boolean;
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
         MergeVerifyRequest: {
             /** Format: int64 */
             mergeRequestId: number;
@@ -7790,15 +7873,6 @@ export interface components {
             labels?: components["schemas"]["SkillLabelDto"][];
             avatarUrl?: string;
             managementState?: components["schemas"]["ManagementState"];
-        };
-        ApiResponseBoolean: {
-            /** Format: int32 */
-            code?: number;
-            msg?: string;
-            data?: boolean;
-            /** Format: date-time */
-            timestamp?: string;
-            requestId?: string;
         };
         ApiResponsePageResponseSkillReviewResponse: {
             /** Format: int32 */
@@ -11145,6 +11219,50 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseListLabelDefinitionResponse"];
+                };
+            };
+        };
+    };
+    getLdapSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseLdapSettingsResponse"];
+                };
+            };
+        };
+    };
+    saveLdapSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LdapSettingsUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseLdapSettingsResponse"];
                 };
             };
         };
@@ -15712,6 +15830,30 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseLabelDefinitionResponse"];
+                };
+            };
+        };
+    };
+    testLdapConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LdapSettingsUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseBoolean"];
                 };
             };
         };

@@ -4,7 +4,6 @@ import com.iflytek.skillhub.auth.federation.adapter.RemoteIdentityIoExecutor;
 import com.iflytek.skillhub.auth.identity.ExternalIdentityAuthenticationService;
 import java.util.HashMap;
 import java.util.Map;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,16 +11,14 @@ import org.springframework.ldap.core.support.DefaultTlsDirContextAuthenticationS
 import org.springframework.ldap.core.support.LdapContextSource;
 
 /**
- * 仅在 LDAP 开关启用时装配独立目录连接及认证提供方。
+ * 动态装配 LDAP 认证提供方，每次认证使用独立配置快照。
  *
  * <p>不启用连接池、不跟随引用；TLS 握手失败不会回退明文，信任由 JVM truststore 提供。
  */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnProperty(prefix = "skillhub.auth.ldap", name = "enabled", havingValue = "true")
 @EnableConfigurationProperties(LdapAuthProperties.class)
 public class LdapAuthenticationConfiguration {
-    @Bean
-    public LdapContextSource ldapAuthContextSource(LdapAuthProperties properties) {
+    public static LdapContextSource createContextSource(LdapAuthProperties properties) {
         properties.validate();
         LdapContextSource source = new LdapContextSource();
         source.setUrl(properties.getUrl());
@@ -45,14 +42,16 @@ public class LdapAuthenticationConfiguration {
     }
 
     @Bean
-    public LdapDirectoryAuthenticator ldapDirectoryAuthenticator(LdapContextSource ldapAuthContextSource,
-            LdapAuthProperties properties, RemoteIdentityIoExecutor remoteIdentityIoExecutor) {
-        return new LdapDirectoryAuthenticator(ldapAuthContextSource, properties, remoteIdentityIoExecutor);
+    public LdapDirectoryAuthenticator ldapDirectoryAuthenticator(LdapSettingsService settings,
+            RemoteIdentityIoExecutor remoteIdentityIoExecutor) {
+        return new LdapDirectoryAuthenticator(settings::current, remoteIdentityIoExecutor);
     }
 
     @Bean
-    public LdapDirectAuthProvider ldapDirectAuthProvider(LdapDirectoryAuthenticator ldapDirectoryAuthenticator,
-            ExternalIdentityAuthenticationService externalIdentityAuthenticationService) {
-        return new LdapDirectAuthProvider(ldapDirectoryAuthenticator, externalIdentityAuthenticationService);
+    public LdapDirectAuthProvider ldapDirectAuthProvider(LdapDirectoryAuthenticator authenticator,
+            ExternalIdentityAuthenticationService identityService, LdapSettingsService settings) {
+        return new LdapDirectAuthProvider(authenticator, identityService) {
+            @Override public boolean enabled() { return settings.enabled(); }
+        };
     }
 }

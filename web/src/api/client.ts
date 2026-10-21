@@ -1856,3 +1856,16 @@ export const notificationApi = {
     })
   },
 }
+
+export type LdapSettings = components['schemas']['LdapSettingsResponse']
+export type LdapConfiguration = components['schemas']['LdapAuthProperties']
+export type LdapSettingsUpdate = components['schemas']['LdapSettingsUpdateRequest']
+export const ldapSettingsApi = {
+  get: () => fetchJson<LdapSettings>('/api/v1/admin/auth/ldap'),
+  save: async (request: LdapSettingsUpdate) => fetchJson<LdapSettings>('/api/v1/admin/auth/ldap', {
+    method: 'PUT', headers: await ensureCsrfHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(request),
+  }),
+  test: async (request: LdapSettingsUpdate) => fetchJson<boolean>('/api/v1/admin/auth/ldap/test', {
+    method: 'POST', headers: await ensureCsrfHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(request),
+  }),
+}

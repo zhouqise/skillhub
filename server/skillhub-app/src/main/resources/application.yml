@@ -167,6 +167,7 @@ skillhub:
       role-grants-json: '${SKILLHUB_AUTH_INITIAL_ROLE_GRANTS_JSON:[]}'
     mock:
       enabled: ${SKILLHUB_AUTH_MOCK_ENABLED:false}
+    ldap-settings-encryption-key: ${SKILLHUB_AUTH_LDAP_SETTINGS_ENCRYPTION_KEY:}
     ldap:
       enabled: "${SKILLHUB_AUTH_LDAP_ENABLED:false}"
       directory-id: "${SKILLHUB_AUTH_LDAP_DIRECTORY_ID:}"

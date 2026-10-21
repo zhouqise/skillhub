@@ -99,8 +99,10 @@ public class AuthMethodCatalog {
                 buildAuthorizationUrl(entry.getKey(), sanitizedReturnTo)
             )));
 
-        if (directAuthProperties.isEnabled()) {
+        {
             directAuthProviders.stream()
+                .filter(provider -> directAuthProperties.isEnabled() || "ldap".equals(provider.providerCode()))
+                .filter(DirectAuthProvider::enabled)
                 .filter(provider -> !"local".equals(provider.providerCode())
                         || passwordEnabled)
                 .sorted(Comparator.comparing(DirectAuthProvider::providerCode))

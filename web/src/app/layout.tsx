@@ -47,6 +47,7 @@ export function Layout() {
       ...group,
       items: group.items.filter((item) => (
         (!item.admin || governanceVisible)
+        && (!item.superAdmin || user?.platformRoles?.includes('SUPER_ADMIN'))
         && (!item.passwordCapability || user?.canChangePassword === true)
       )),
     }))
