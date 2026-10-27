@@ -25,9 +25,9 @@ export function LoginPage() {
   const search = useSearch({ from: '/login' })
   const bootstrapConfig = getSessionBootstrapRuntimeConfig()
   const submitting = useRef(false)
-  const [passwordProvider, setPasswordProvider] = useState('local')
+  const [passwordProvider, setPasswordProvider] = useState('ldap')
   const [inFlightProvider, setInFlightProvider] = useState<string | null>(null)
-  const [credentialProvider, setCredentialProvider] = useState('local')
+  const [credentialProvider, setCredentialProvider] = useState('ldap')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -42,7 +42,7 @@ export function LoginPage() {
     ...(passwordEnabled ? [{ provider: 'local', label: t('login.localLogin') }] : []),
     ...(authMethods ?? []).filter((method) => method.methodType === 'DIRECT_PASSWORD' && method.provider && method.provider !== 'local')
       .map((method) => ({ provider: method.provider!, label: method.provider === 'ldap' ? t('login.ldapLogin') : method.displayName })),
-  ]
+  ].sort((a, b) => Number(b.provider === 'ldap') - Number(a.provider === 'ldap'))
   const availableProvider = passwordMethods.some((method) => method.provider === passwordProvider)
     ? passwordProvider : passwordMethods[0]?.provider ?? 'local'
   const selectedProvider = inFlightProvider ?? availableProvider
@@ -247,14 +247,6 @@ export function LoginPage() {
             <AuthMethodButtonList methods={authMethods} isLoading={authMethodsLoading} compact />
           </section>
         ) : null}
-
-        {isLocalLogin && localCapabilities?.registrationAvailable ? <p className="text-center text-sm text-muted-foreground">
-          {t('login.noAccount')}
-          {' '}
-          <Link to="/register" search={{ returnTo }} className="font-medium text-sky-700 hover:underline dark:text-sky-300">
-            {t('login.register')}
-          </Link>
-        </p> : null}
 
         <p className="mt-auto text-center text-xs text-muted-foreground">
           {t('login.agreementPrefix')}

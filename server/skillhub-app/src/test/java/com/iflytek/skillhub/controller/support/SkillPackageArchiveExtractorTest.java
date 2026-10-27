@@ -29,6 +29,29 @@ class SkillPackageArchiveExtractorTest {
     }
 
     @Test
+    void accepts500FilesAndRejects501UsingApplicationConfiguration() throws Exception {
+        var yaml = new org.springframework.boot.env.YamlPropertySourceLoader()
+                .load("application", new org.springframework.core.io.ClassPathResource("application.yml"));
+        var sources = new org.springframework.core.env.MutablePropertySources();
+        yaml.forEach(sources::addLast);
+        SkillPublishProperties props = new org.springframework.boot.context.properties.bind.Binder(
+                org.springframework.boot.context.properties.source.ConfigurationPropertySources.from(sources))
+                .bind("skillhub.publish", SkillPublishProperties.class).get();
+        assertEquals(500, props.getMaxFileCount());
+        var configuredExtractor = new SkillPackageArchiveExtractor(props);
+        Map<String, byte[]> files = new java.util.LinkedHashMap<>();
+        files.put("SKILL.md", "skill".getBytes(StandardCharsets.UTF_8));
+        for (int i = 1; i < 500; i++) {
+            files.put("file-" + i + ".txt", new byte[]{1});
+        }
+        assertEquals(500, configuredExtractor.extract(new MockMultipartFile(
+                "file", "skill.zip", "application/zip", createZip(files))).size());
+        files.put("file-500.txt", new byte[]{1});
+        var oversized = new MockMultipartFile("file", "skill.zip", "application/zip", createZip(files));
+        assertThrows(IllegalArgumentException.class, () -> configuredExtractor.extract(oversized));
+    }
+
+    @Test
     void shouldRejectPathTraversalEntry() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
             "file",

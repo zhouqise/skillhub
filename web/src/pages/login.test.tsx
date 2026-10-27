@@ -125,7 +125,7 @@ describe('LoginPage', () => {
     expect(html).toContain('login.subtitle')
     expect(html).toContain('login.submit')
     expect(html).not.toContain('login.tabEnterprise')
-    expect(html).toContain('login.register')
+    expect(html).not.toContain('login.register')
   })
 
   it('hides password and registration entry when local authentication is disabled', () => {
@@ -219,6 +219,10 @@ describe('LoginPage', () => {
   it('selects LDAP, clears credentials and hides local account actions', () => {
     authMethodsFixture.methods = [{ id: 'direct-ldap', methodType: 'DIRECT_PASSWORD', provider: 'ldap', displayName: 'LDAP' }]
     render(<LoginPage />)
+    expect(authMethodsFixture.target).toEqual({ provider: 'ldap' })
+    const choices = screen.getAllByRole('button').filter((button) => button.textContent?.endsWith('Login'))
+    expect(choices.map((button) => button.textContent)).toEqual(['login.ldapLogin', 'login.localLogin'])
+    fireEvent.click(screen.getByRole('button', { name: 'login.localLogin' }))
     expect(authMethodsFixture.target).toBe('local')
     fireEvent.change(screen.getByLabelText('login.password'), { target: { value: 'local-secret' } })
     fireEvent.click(screen.getByRole('button', { name: 'login.ldapLogin' }))
@@ -246,6 +250,7 @@ describe('LoginPage', () => {
     let resolve!: () => void
     authMethodsFixture.mutateAsync.mockImplementationOnce(() => new Promise<void>((done) => { resolve = done }))
     const { rerender } = render(<LoginPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'login.localLogin' }))
     fireEvent.change(screen.getByLabelText('login.username'), { target: { value: 'alice' } })
     fireEvent.change(screen.getByLabelText('login.password'), { target: { value: 'secret' } })
     fireEvent.click(screen.getByRole('button', { name: 'login.submit' }))
@@ -267,6 +272,10 @@ describe('LoginPage', () => {
     fireEvent.change(screen.getByLabelText('login.password'), { target: { value: 'directory-secret' } })
     authMethodsFixture.passwordEnabled = true
     rerender(<LoginPage />)
+    expect(authMethodsFixture.target).toEqual({ provider: 'ldap' })
+    expect((screen.getByLabelText('login.password') as HTMLInputElement).value).toBe('directory-secret')
+    fireEvent.click(screen.getByRole('button', { name: 'login.localLogin' }))
+    rerender(<LoginPage />)
     expect(authMethodsFixture.target).toBe('local')
     expect((screen.getByLabelText('login.password') as HTMLInputElement).value).toBe('')
     fireEvent.change(screen.getByLabelText('login.password'), { target: { value: 'local-secret' } })
@@ -282,6 +291,7 @@ describe('LoginPage', () => {
     let resolve!: () => void
     authMethodsFixture.mutateAsync.mockImplementationOnce(() => new Promise<void>((done) => { resolve = done }))
     const { rerender } = render(<LoginPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'login.localLogin' }))
     fireEvent.change(screen.getByLabelText('login.username'), { target: { value: 'alice' } })
     fireEvent.change(screen.getByLabelText('login.password'), { target: { value: 'local-secret' } })
     fireEvent.click(screen.getByRole('button', { name: 'login.submit' }))
