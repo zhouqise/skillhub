@@ -38,6 +38,22 @@ class LdapDirectAuthProviderTest {
     }
 
     @Test
+    void displaysMappedMailWithoutEmailAuthorityOrChangingAccountIdentity() {
+        when(directory.authenticate("alice", "secret"))
+                .thenReturn(new LdapIdentity("corp:entryuuid:abc", "Alice", "alice@example.com"));
+        when(identities.authenticate(any())).thenReturn(new PlatformPrincipal("usr_1", "Alice", null,
+                null, "ldap", Set.of("USER")));
+        PlatformPrincipal principal = provider.authenticate(new DirectAuthRequest("alice", "secret"));
+        assertThat(principal.email()).isEqualTo("alice@example.com");
+        assertThat(principal.platformRoles()).containsExactly("USER");
+        ArgumentCaptor<OAuthClaims> claims = ArgumentCaptor.forClass(OAuthClaims.class);
+        verify(identities).authenticate(claims.capture());
+        assertThat(claims.getValue().email()).isNull();
+        assertThat(claims.getValue().emailVerified()).isFalse();
+        assertThat(claims.getValue().extra()).containsEntry("ldap_profile_email", "alice@example.com");
+    }
+
+    @Test
     void directoryFailureCannotProvisionAnAccount() {
         when(directory.authenticate(any(), any())).thenThrow(new AuthFlowException(HttpStatus.UNAUTHORIZED, "error.auth.ldap.credentials"));
         assertThatThrownBy(() -> provider.authenticate(new DirectAuthRequest("alice", "wrong")))

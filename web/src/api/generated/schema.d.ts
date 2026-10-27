@@ -6636,6 +6636,7 @@ export interface components {
             userFilter?: string;
             subjectAttribute?: string;
             displayNameAttribute?: string;
+            emailAttribute?: string;
             /** Format: int32 */
             connectTimeoutMs?: number;
             /** Format: int32 */

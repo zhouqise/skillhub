@@ -74,6 +74,21 @@ class IdentityBindingServiceTest {
     }
 
     @Test
+    void ldapContactMailIsPersistedSeparatelyFromRecoveryEmail() {
+        OAuthClaims claims = new OAuthClaims("ldap", "corp:entryuuid:abc", null, false, "Alice",
+                Map.of("ldap_profile_email", "alice@example.com"));
+        when(bindingRepo.findByProviderCodeAndSubject("ldap", claims.subject())).thenReturn(Optional.empty());
+        when(userRepo.save(any(UserAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(roleBindingRepo.findByUserId(any())).thenReturn(List.of());
+        PlatformPrincipal principal = service.bindOrCreate(claims, UserStatus.ACTIVE);
+        assertThat(principal.email()).isNull();
+        org.mockito.ArgumentCaptor<IdentityBinding> binding = org.mockito.ArgumentCaptor.forClass(IdentityBinding.class);
+        verify(bindingRepo).save(binding.capture());
+        assertThat(binding.getValue().getExtraJson()).contains("alice@example.com");
+        verify(userRepo, org.mockito.Mockito.never()).findByEmailIgnoreCase(any());
+    }
+
+    @Test
     void bindOrCreate_assignsGlobalMembershipForActiveNewUsers() {
         OAuthClaims claims = new OAuthClaims(
                 "github",

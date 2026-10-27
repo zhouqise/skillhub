@@ -90,14 +90,16 @@ public class LdapDirectoryAuthenticator {
                 throw credentials();
             }
             // 真实读取确保已完成认证，不仅以创建上下文成功作为身份凭据。
-            Attributes attributes = userContext.getAttributes(fullDn, new String[] {
-                    ldapAuthProperties.getSubjectAttribute(), ldapAuthProperties.getDisplayNameAttribute()});
+            List<String> requested = new ArrayList<>(List.of(ldapAuthProperties.getSubjectAttribute(),
+                    ldapAuthProperties.getDisplayNameAttribute()));
+            if (!ldapAuthProperties.getEmailAttribute().isEmpty()) requested.add(ldapAuthProperties.getEmailAttribute());
+            Attributes attributes = userContext.getAttributes(fullDn, requested.toArray(String[]::new));
             String subject = stableSubject(attributes);
             Attribute name = attributes.get(ldapAuthProperties.getDisplayNameAttribute());
             String displayName = name != null && name.size() == 1 && name.get() instanceof String value
                     && !value.isBlank() ? value.trim() : subject;
             int end = displayName.offsetByCodePoints(0, Math.min(128, displayName.codePointCount(0, displayName.length())));
-            return new LdapIdentity(subject, displayName.substring(0, end));
+            return new LdapIdentity(subject, displayName.substring(0, end), directoryEmail(attributes));
         } catch (AuthFlowException classified) {
             throw classified;
         } catch (NamingException | org.springframework.ldap.NamingException failure) {
@@ -105,6 +107,15 @@ public class LdapDirectoryAuthenticator {
         } finally {
             close(userContext);
         }
+    }
+
+    /** Optional directory contact data never participates in identity or authorization. */
+    private String directoryEmail(Attributes attributes) throws NamingException {
+        if (ldapAuthProperties.getEmailAttribute().isEmpty()) return null;
+        Attribute mail = attributes.get(ldapAuthProperties.getEmailAttribute());
+        if (mail == null || mail.size() != 1 || !(mail.get() instanceof String value)) return null;
+        String email = value.trim();
+        return email.length() <= 256 && email.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+") ? email : null;
     }
 
     private String findUniqueDn(String username) {

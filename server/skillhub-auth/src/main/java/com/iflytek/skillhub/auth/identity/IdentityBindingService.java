@@ -121,6 +121,7 @@ public class IdentityBindingService {
             }
         }
 
+        saveDirectoryProfile(binding, claims);
         ensureExternalLoginAllowed(user);
 
         Set<String> roles = roleBindingRepo.findByUserId(user.getId()).stream()
@@ -165,6 +166,7 @@ public class IdentityBindingService {
 
         IdentityBinding binding = new IdentityBinding(user.getId(), claims.provider(), claims.subject(), claims.providerLogin());
         bindingRepo.saveAndFlush(binding);
+        saveDirectoryProfile(binding, claims);
     }
 
     private PlatformPrincipal resolveConcurrentWinner(OAuthClaims claims) {
@@ -201,6 +203,20 @@ public class IdentityBindingService {
         TransactionTemplate template = new TransactionTemplate(transactionManager);
         template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         return template;
+    }
+
+    /**
+     * Persist optional LDAP contact data separately from verified account email.
+     * Missing mail clears the previous directory value on the next successful login.
+     */
+    private void saveDirectoryProfile(IdentityBinding binding, OAuthClaims claims) {
+        if (!"ldap".equals(claims.provider())) return;
+        com.fasterxml.jackson.databind.node.ObjectNode profile =
+                com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
+        Object email = claims.extra().get("ldap_profile_email");
+        if (email instanceof String value) profile.put("email", value);
+        binding.setExtraJson(profile.toString());
+        bindingRepo.save(binding);
     }
 
     private String trustedEmail(OAuthClaims claims) {

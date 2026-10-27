@@ -38,6 +38,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @TestPropertySource(properties = {
+    "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
     "skillhub.auth.direct.enabled=true", "skillhub.auth.ldap.enabled=true",
     "skillhub.auth.ldap.directory-id=corp", "skillhub.auth.ldap.url=ldaps://localhost:1",
     "skillhub.auth.ldap.base-dn=dc=example,dc=com", "skillhub.auth.ldap.bind-dn=cn=reader,dc=example,dc=com",
@@ -56,6 +57,9 @@ class LdapAccountIntegrationTest {
     @Autowired private com.iflytek.skillhub.auth.oauth.LegacyPlatformIdentityCore identityCore;
     @Autowired private LocalCredentialRepository credentials;
     @Autowired private LdapDirectAuthProvider provider;
+    // Unrelated PostgreSQL-specific review projections are not part of authentication coverage.
+    @MockBean private com.iflytek.skillhub.infra.jpa.ReviewTaskJpaRepository reviewTasks;
+    @MockBean private com.iflytek.skillhub.infra.jpa.PromotionRequestJpaRepository promotionRequests;
     @MockBean private LdapDirectoryAuthenticator directory;
     @MockBean private com.iflytek.skillhub.auth.settings.LocalAuthSettingsService localAuthSettingsService;
 
@@ -72,7 +76,7 @@ class LdapAccountIntegrationTest {
         String localId = "local-" + UUID.randomUUID();
         users.save(new UserAccount(localId, name, "local@example.com", null));
         String subject = "corp:entryuuid:" + UUID.randomUUID();
-        given(directory.authenticate(name, "secret")).willReturn(new LdapIdentity(subject, name));
+        given(directory.authenticate(name, "secret")).willReturn(new LdapIdentity(subject, name, "local@example.com"));
         MockHttpSession session = new MockHttpSession();
         String before = session.getId();
         var result = mvc.perform(post("/api/v1/auth/direct/login").session(session).with(csrf())
@@ -84,10 +88,18 @@ class LdapAccountIntegrationTest {
         assertThat(session.getId()).isNotEqualTo(before);
         assertThat(bindings.findByProviderCodeAndSubject("ldap", subject).orElseThrow().getUserId()).isEqualTo(id);
         assertThat(credentials.existsByUserId(id)).isFalse();
+        assertThat(users.findById(id).orElseThrow().getEmail()).isNull();
+        assertThat(users.findById(localId).orElseThrow().getEmail()).isEqualTo("local@example.com");
+        assertThat(bindings.findByProviderCodeAndSubject("ldap", subject).orElseThrow().getExtraJson())
+                .contains("local@example.com");
         assertThat(users.findById(id).orElseThrow().getStatus()).isEqualTo(UserStatus.ACTIVE);
         var returning = provider.authenticate(new DirectAuthRequest(name, "secret"));
         assertThat(returning.userId()).isEqualTo(id);
         assertThat(returning.platformRoles()).containsExactly("USER");
+        assertThat(returning.email()).isEqualTo("local@example.com");
+        given(directory.authenticate(name, "secret")).willReturn(new LdapIdentity(subject, name));
+        assertThat(provider.authenticate(new DirectAuthRequest(name, "secret")).email()).isNull();
+        assertThat(bindings.findByProviderCodeAndSubject("ldap", subject).orElseThrow().getExtraJson()).isEqualTo("{}");
         UserAccount disabled = users.findById(id).orElseThrow();
         disabled.setStatus(UserStatus.DISABLED);
         users.save(disabled);

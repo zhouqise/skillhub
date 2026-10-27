@@ -2811,7 +2811,7 @@
     "bindPassword": "Bind password",
     "userSearchBase": "User search base (relative to base DN)",
     "userFilter": "User filter ({0} represents username)",
-    "displayNameAttribute": "Display name attribute",
+    "displayNameAttribute": "Атрибут имени",
     "subjectAttribute": "Stable identity attribute",
     "tlsMode": "Transport security",
     "plain": "PLAIN (unencrypted, trusted networks only)",
@@ -2829,6 +2829,16 @@
     "testing": "Testing…",
     "testPassed": "Directory bind and search base access succeeded.",
     "testHint": "Tests use this form without saving settings or creating users. Success does not verify employee password login.",
-    "failed": "Operation failed. Please retry."
+    "failed": "Operation failed. Please retry.",
+    "connection": "Подключение",
+    "search": "Поиск пользователей",
+    "userOu": "OU пользователей",
+    "userOuHint": "Полный DN, например ou=people,dc=example,dc=com.",
+    "mapping": "Сопоставление атрибутов",
+    "loginAttribute": "Атрибут логина",
+    "emailAttribute": "Атрибут почты (необязательно)",
+    "mappingHint": "Обычно: логин uid, имя displayName, почта mail. Почта каталога отображается в профиле, но не используется для восстановления локального пароля. Пустое поле отключает чтение почты.",
+    "customFilterHint": "Используется свой фильтр. Измените правило поиска в дополнительных настройках.",
+    "advanced": "Дополнительные настройки"
   }
 }

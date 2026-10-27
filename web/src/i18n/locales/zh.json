@@ -2808,7 +2808,7 @@
     "bindPassword": "查询账号密码",
     "userSearchBase": "用户搜索路径（相对基础 DN）",
     "userFilter": "用户过滤器（使用 {0} 代表用户名）",
-    "displayNameAttribute": "显示名称属性",
+    "displayNameAttribute": "姓名属性",
     "subjectAttribute": "稳定身份属性",
     "tlsMode": "连接加密",
     "plain": "PLAIN（明文，仅用于受信网络）",
@@ -2826,6 +2826,16 @@
     "testing": "测试中…",
     "testPassed": "目录绑定与搜索路径访问成功。",
     "testHint": "测试使用当前表单，不保存配置、不创建用户；测试成功不代表员工密码登录已验证。",
-    "failed": "操作失败，请重试。"
+    "failed": "操作失败，请重试。",
+    "connection": "连接信息",
+    "search": "用户搜索",
+    "userOu": "用户 OU",
+    "userOuHint": "填写完整路径，例如 ou=people,dc=example,dc=com。",
+    "mapping": "属性映射",
+    "loginAttribute": "登录名属性",
+    "emailAttribute": "邮箱属性（可选）",
+    "mappingHint": "常用映射：登录名 uid、姓名 displayName、邮箱 mail。邮箱仅作目录资料展示，不用于找回普通登录密码；留空不读取邮箱。",
+    "customFilterHint": "当前使用自定义过滤器，请在高级设置中修改登录名搜索规则。",
+    "advanced": "高级设置"
   }
 }

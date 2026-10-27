@@ -62,6 +62,26 @@ class LdapDirectoryAuthenticatorTest {
     }
 
     @Test
+    void mapsOptionalMailWithoutChangingStableIdentity() throws Exception {
+        properties.setDisplayNameAttribute("displayName");
+        properties.setEmailAttribute("mail");
+        server.modify(USER_DN, new Modification(ModificationType.REPLACE, "displayName", "Alice Example"),
+                new Modification(ModificationType.REPLACE, "mail", "alice@example.com"));
+        LdapIdentity identity = authenticator().authenticate("alice", "user-secret");
+        assertThat(identity.displayName()).isEqualTo("Alice Example");
+        assertThat(identity.email()).isEqualTo("alice@example.com");
+        assertThat(identity.subject()).isEqualTo("corp:entryuuid:" + ID);
+        server.modify(USER_DN, new Modification(ModificationType.REPLACE, "mail", "invalid"));
+        assertThat(authenticator().authenticate("alice", "user-secret").email()).isNull();
+        server.modify(USER_DN, new Modification(ModificationType.REPLACE, "mail", "a@example.com", "b@example.com"));
+        assertThat(authenticator().authenticate("alice", "user-secret").email()).isNull();
+        server.modify(USER_DN, new Modification(ModificationType.REPLACE, "mail", "x".repeat(250) + "@example.com"));
+        assertThat(authenticator().authenticate("alice", "user-secret").email()).isNull();
+        properties.setEmailAttribute("");
+        assertThat(authenticator().authenticate("alice", "user-secret").email()).isNull();
+    }
+
+    @Test
     void dynamicSnapshotsEnableDisableAndChangeConnectionWithoutRestart() {
         java.util.concurrent.atomic.AtomicReference<LdapAuthProperties> current = new java.util.concurrent.atomic.AtomicReference<>(properties);
         LdapDirectoryAuthenticator dynamic = new LdapDirectoryAuthenticator(current::get, new RemoteIdentityIoExecutor() {

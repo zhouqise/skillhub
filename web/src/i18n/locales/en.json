@@ -2809,7 +2809,7 @@
     "bindPassword": "Bind password",
     "userSearchBase": "User search base (relative to base DN)",
     "userFilter": "User filter ({0} represents username)",
-    "displayNameAttribute": "Display name attribute",
+    "displayNameAttribute": "Name attribute",
     "subjectAttribute": "Stable identity attribute",
     "tlsMode": "Transport security",
     "plain": "PLAIN (unencrypted, trusted networks only)",
@@ -2827,6 +2827,16 @@
     "testing": "Testing…",
     "testPassed": "Directory bind and search base access succeeded.",
     "testHint": "Tests use this form without saving settings or creating users. Success does not verify employee password login.",
-    "failed": "Operation failed. Please retry."
+    "failed": "Operation failed. Please retry.",
+    "connection": "Connection",
+    "search": "User search",
+    "userOu": "User OU",
+    "userOuHint": "Enter the full DN, for example ou=people,dc=example,dc=com.",
+    "mapping": "Attribute mapping",
+    "loginAttribute": "Login attribute",
+    "emailAttribute": "Email attribute (optional)",
+    "mappingHint": "Common mappings: login uid, name displayName, email mail. Directory email is for profile display, not local password recovery. Leave blank to skip email.",
+    "customFilterHint": "A custom filter is in use. Edit the login search rule in advanced settings.",
+    "advanced": "Advanced settings"
   }
 }

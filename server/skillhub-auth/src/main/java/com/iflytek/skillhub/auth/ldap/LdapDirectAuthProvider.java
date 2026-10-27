@@ -42,9 +42,13 @@ public class LdapDirectAuthProvider implements DirectAuthProvider {
     public PlatformPrincipal authenticate(DirectAuthRequest request) {
         LdapIdentity identity = ldapDirectoryAuthenticator.authenticate(request.username(), request.password());
         OAuthClaims claims = new OAuthClaims("ldap", identity.subject(), null, false,
-                identity.displayName(), Map.of());
+                identity.displayName(), identity.email() == null ? Map.of() : Map.of("ldap_profile_email", identity.email()));
         try {
-            return externalIdentityAuthenticationService.authenticate(claims);
+            PlatformPrincipal principal = externalIdentityAuthenticationService.authenticate(claims);
+            // Directory contact data is displayed only in this LDAP session, never used for password recovery.
+            return identity.email() == null ? principal : new PlatformPrincipal(principal.userId(),
+                    principal.displayName(), identity.email(), principal.avatarUrl(), principal.oauthProvider(),
+                    principal.platformRoles());
         } catch (OAuth2AuthenticationException denied) {
             throw new AuthFlowException(HttpStatus.FORBIDDEN, "error.auth.ldap.accessDenied");
         }

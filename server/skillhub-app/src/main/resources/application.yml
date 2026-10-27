@@ -180,6 +180,7 @@ skillhub:
       user-filter: "${SKILLHUB_AUTH_LDAP_USER_FILTER:(uid={0})}"
       subject-attribute: "${SKILLHUB_AUTH_LDAP_SUBJECT_ATTRIBUTE:entryUUID}"
       display-name-attribute: "${SKILLHUB_AUTH_LDAP_DISPLAY_NAME_ATTRIBUTE:cn}"
+      email-attribute: "${SKILLHUB_AUTH_LDAP_EMAIL_ATTRIBUTE:}"
       connect-timeout-ms: "${SKILLHUB_AUTH_LDAP_CONNECT_TIMEOUT_MS:3000}"
       read-timeout-ms: "${SKILLHUB_AUTH_LDAP_READ_TIMEOUT_MS:5000}"
       search-time-limit-ms: "${SKILLHUB_AUTH_LDAP_SEARCH_TIME_LIMIT_MS:5000}"

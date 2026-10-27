@@ -24,6 +24,7 @@ public class LdapAuthProperties {
     private String userFilter = "(uid={0})";
     private String subjectAttribute = "entryUUID";
     private String displayNameAttribute = "cn";
+    private String emailAttribute = "";
     private int connectTimeoutMs = 3000;
     private int readTimeoutMs = 5000;
     private int searchTimeLimitMs = 5000;
@@ -35,7 +36,7 @@ public class LdapAuthProperties {
      */
     public void validate() {
         for (String value : new String[]{directoryId, url, tlsMode, baseDn, bindDn, userSearchBase,
-                userFilter, subjectAttribute, displayNameAttribute}) {
+                userFilter, subjectAttribute, displayNameAttribute, emailAttribute}) {
             require(value != null && value.length() <= 2048, "field-length");
         }
         require(bindPassword != null && bindPassword.length() <= 4096, "bind-password");
@@ -65,6 +66,7 @@ public class LdapAuthProperties {
         require(userFilter != null && userFilter.contains("{0}")
                 && !userFilter.replace("{0}", "").matches(".*[{}].*"), "user-filter");
         require("entryUUID".equals(subjectAttribute) || "objectGUID".equals(subjectAttribute), "subject-attribute");
+        require(emailAttribute.isEmpty() || emailAttribute.matches("[a-zA-Z][a-zA-Z0-9-]*"), "email-attribute");
         require(displayNameAttribute != null && displayNameAttribute.matches("[a-zA-Z][a-zA-Z0-9-]*"), "display-name-attribute");
         require(connectTimeoutMs > 0 && connectTimeoutMs <= 30000, "connect-timeout-ms");
         require(readTimeoutMs > 0 && readTimeoutMs <= 30000, "read-timeout-ms");
@@ -109,6 +111,8 @@ public class LdapAuthProperties {
     public void setSubjectAttribute(String value) { this.subjectAttribute = value; }
     public String getDisplayNameAttribute() { return displayNameAttribute; }
     public void setDisplayNameAttribute(String value) { this.displayNameAttribute = value; }
+    public String getEmailAttribute() { return emailAttribute; }
+    public void setEmailAttribute(String value) { this.emailAttribute = value; }
     public int getConnectTimeoutMs() { return connectTimeoutMs; }
     public void setConnectTimeoutMs(int value) { this.connectTimeoutMs = value; }
     public int getReadTimeoutMs() { return readTimeoutMs; }

@@ -811,3 +811,16 @@ LDAP 参数由公司目录管理员提供：服务器 URL、LDAPS/STARTTLS、基
 用户搜索路径、过滤器及稳定身份属性（OpenLDAP `entryUUID` 或 AD `objectGUID`）。
 内部 CA 通过 JVM truststore 配置信任，不提供跳过证书校验选项。
 测试与保存审计只记录操作者、动作、版本和结果，不记录目录密码、配置正文或目录查询结果。
+
+#### 简化配置与目录资料映射
+
+页面按连接信息、用户搜索、属性映射分组，高级设置默认折叠。用户 OU 使用完整 DN；
+旧的 baseDn 与相对 userSearchBase 合并展示，未编辑时保持原值，编辑后将完整路径存入
+baseDn 并清空 userSearchBase。登录名属性生成 `(属性={0})`，原有复杂过滤器仍通过高级设置维护。
+
+姓名使用 displayNameAttribute。可选 emailAttribute（环境变量
+`SKILLHUB_AUTH_LDAP_EMAIL_ATTRIBUTE`）默认为空，以保持现有目录行为；配置为 `mail`
+即可读取邮箱。缺失、多值、格式非法或超过 256 字符的邮箱不展示，稳定身份读取失败仍拒绝认证。
+邮箱保存在 LDAP identity_binding.extra_json 的 email 字段，并在本次 LDAP 会话展示。
+此字段不是已验证邮箱，不写入 user_account.email，不用于密码恢复、邮箱准入、预授角色或账号合并。
+每次成功登录刷新目录资料；清空映射后下一次登录不再携带目录邮箱。普通登录不受影响。
